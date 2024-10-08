@@ -1,8 +1,11 @@
+import numpy as np
+
+
 class SpreadCalculator:
     """
     Calculates the spread and z-score based on the hedge ratio.
     """
-    def __init__(self, data, hedge_ratio, dependent_var, independent_var, window=300):
+    def __init__(self, data, hedge_ratio, dependent_var, independent_var, window=20):
         self.data = data.copy()
         self.hedge_ratio = hedge_ratio
         self.dependent_var = dependent_var
@@ -21,6 +24,11 @@ class SpreadCalculator:
         """
         self.data['Mean'] = self.data['Spread'].rolling(window=self.window).mean()
         self.data['Std'] = self.data['Spread'].rolling(window=self.window).std()
-        self.data.dropna(inplace=True)
+
+        # 避免标准差为零
+        self.data['Std'].replace(0, np.nan, inplace=True)
+        self.data.dropna(subset=['Std'], inplace=True)
+
         self.data['ZScore'] = (self.data['Spread'] - self.data['Mean']) / self.data['Std']
         return self.data
+

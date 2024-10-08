@@ -33,7 +33,7 @@ class DataFetcher:
         if self.ib:
             self.ib.disconnect()
 
-    def fetch_data(self):
+    def fetch_data_minute_level(self):
         """
         Fetches the previous 90 days of minute-level historical close price data using the IBroker API.
         The data is fetched in 30-day chunks per iteration to comply with API limitations.
@@ -114,3 +114,87 @@ class DataFetcher:
             return None
         finally:
             self.disconnect()
+
+    def fetch_data(self):
+        """
+        Fetches historical daily price data for the specified period.
+        IBroker API allows up to 1 year of daily data per request, so we fetch in 1-year chunks.
+
+        Returns:
+            pd.DataFrame or None: A DataFrame containing the close prices indexed by date,
+                                   or None if an error occurs.
+        """
+        try:
+            self.connect()
+
+            # Define the contract
+            contract = Stock(self.symbol, 'SMART', 'USD')
+
+            data_frames = []
+            current_end_date = self.end_date
+
+            while current_end_date > self.start_date:
+                # Calculate the duration to fetch (1 year or remaining days)
+                remaining_days = (current_end_date - self.start_date).days
+                fetch_days = min(365, remaining_days)
+                duration_str = f"{fetch_days} D"  # e.g., '365 D'
+
+                # Format the endDateTime as required by IBroker API (YYYYMMDD HH:MM:SS)
+                end_datetime_str = current_end_date.strftime("%Y%m%d %H:%M:%S")
+
+                print(f"Fetching data for {self.symbol} from {end_datetime_str} back {duration_str}.")
+
+                # Request historical data
+                bars = self.ib.reqHistoricalData(
+                    contract,
+                    endDateTime=end_datetime_str,
+                    durationStr=duration_str,
+                    barSizeSetting='1 day',
+                    whatToShow='TRADES',
+                    useRTH=True,
+                    formatDate=1,
+                    keepUpToDate=False
+                )
+
+                if not bars:
+                    print(f"No bars returned for {self.symbol} ending at {current_end_date}.")
+                    break
+
+                # Convert bars to DataFrame
+                df = util.df(bars)
+                df['date'] = pd.to_datetime(df['date']).dt.tz_localize('America/New_York')
+                df.set_index('date', inplace=True)
+                df = df[['close']]
+                df.rename(columns={'close': 'Price'}, inplace=True)
+
+                # Append to list
+                data_frames.append(df)
+
+                # Update current_end_date for next iteration
+                earliest_date = df.index.min()
+                current_end_date = earliest_date - timedelta(days=1)
+
+                print(f"Fetched {len(df)} records. Next end_date: {current_end_date}")
+
+                # Sleep to comply with rate limits
+                time.sleep(2)
+
+            # Concatenate all DataFrames
+            if data_frames:
+                self.data = pd.concat(data_frames)
+                self.data.sort_index(inplace=True)
+                # Filter data within the start_date and end_date
+                self.data = self.data[(self.data.index >= self.start_date) & (self.data.index <= self.end_date)]
+                print(f"Total records fetched: {len(self.data)}")
+            else:
+                print(f"No data fetched for symbol {self.symbol}")
+
+            return self.data
+
+        except Exception as e:
+            print(f"Error fetching data for symbol {self.symbol}: {e}")
+            return None
+        finally:
+            self.disconnect()
+
+

@@ -29,3 +29,4 @@ class HedgeRatioCalculator:
         model = OLS(Y, X).fit()
         self.hedge_ratio = model.params[self.independent_var]
         return self.hedge_ratio
+

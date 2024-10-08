@@ -7,7 +7,7 @@ class SignalGenerator:
     Generates trading signals based on z-score thresholds with partial positions.
     """
 
-    def __init__(self, data, entry_threshold=2, exit_threshold=0.5, max_position=1.0):
+    def __init__(self, data, entry_threshold=2.5, exit_threshold=0.5, max_position=1.0):
         """
         Initializes the SignalGenerator.
 
@@ -40,6 +40,19 @@ class SignalGenerator:
         else:
             # Maintain existing position (no change)
             return np.nan  # Will be forward-filled later
+
+    # def calculate_position_size(self, zscore):
+    #     """
+    #     Simplified position sizing: Full positions only.
+    #     """
+    #     if zscore > self.entry_threshold:
+    #         return -self.max_position  # Short spread
+    #     elif zscore < -self.entry_threshold:
+    #         return self.max_position  # Long spread
+    #     elif abs(zscore) < self.exit_threshold:
+    #         return 0  # Exit positions
+    #     else:
+    #         return np.nan  # Maintain existing position
 
     def generate_signals(self):
         """
